@@ -7,43 +7,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, ArrowLeft, CheckCircle, Eye, FileText, Trash2, Download, Info } from "lucide-react";
+import { Upload, ArrowLeft, CheckCircle, Eye, Trash2, Download, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+
+interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  size: string;
+  uploadDate: string;
+  type: string;
+  status: "active" | "inactive";
+}
 
 const ModelManagement = () => {
   const [file, setFile] = useState<File | null>(null);
   const [modelName, setModelName] = useState("");
   const [modelDescription, setModelDescription] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedModels, setUploadedModels] = useState([
+  const [models, setModels] = useState<ModelInfo[]>([
     {
-      id: "1",
-      name: "yolo_v8_custom",
-      description: "Custom trained YOLO v8 model for specific objects",
-      size: "45.2 MB",
-      uploadedAt: "2024-01-15",
-      format: "ONNX",
+      id: "yolo_v8_default",
+      name: "YOLOv8 Default",
+      description: "Pre-trained YOLO v8 model for general object detection",
+      size: "42.5 MB",
+      uploadDate: "2024-01-10",
+      type: "Object Detection",
       status: "active"
     },
     {
-      id: "2", 
-      name: "face_recognition_v2",
-      description: "Enhanced face recognition model with better accuracy",
-      size: "28.7 MB",
-      uploadedAt: "2024-01-16",
-      format: "ONNX",
+      id: "tesseract_eng",
+      name: "Tesseract English",
+      description: "English OCR model using Tesseract engine",
+      size: "12.8 MB", 
+      uploadDate: "2024-01-05",
+      type: "OCR",
       status: "active"
     },
     {
-      id: "3",
-      name: "text_detection_eng",
-      description: "English text detection model for OCR preprocessing",
-      size: "15.4 MB",
-      uploadedAt: "2024-01-17",
-      format: "ONNX",
+      id: "face_recognition_v1",
+      name: "Face Recognition v1",
+      description: "Basic face recognition and detection model",
+      size: "38.2 MB",
+      uploadDate: "2024-01-08",
+      type: "Face Recognition",
       status: "inactive"
-    },
+    }
   ]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,35 +77,43 @@ const ModelManagement = () => {
     setIsUploading(true);
     
     setTimeout(() => {
-      const newModel = {
-        id: String(uploadedModels.length + 1),
+      const newModel: ModelInfo = {
+        id: `custom_${Date.now()}`,
         name: modelName,
-        description: modelDescription || "No description provided",
+        description: modelDescription || "Custom uploaded model",
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-        uploadedAt: new Date().toISOString().split('T')[0],
-        format: "ONNX",
+        uploadDate: new Date().toISOString().split('T')[0],
+        type: "Custom",
         status: "active"
       };
       
-      setUploadedModels([...uploadedModels, newModel]);
+      setModels(prev => [newModel, ...prev]);
+      setIsUploading(false);
       setFile(null);
       setModelName("");
       setModelDescription("");
-      setIsUploading(false);
       
       toast({
-        title: "Upload successful",
-        description: `Model ${modelName} has been uploaded successfully`,
+        title: "Model uploaded successfully!",
+        description: `${modelName} is now available for use`,
       });
-    }, 2000);
+    }, 3000);
   };
 
-  const handleDelete = (modelId: string) => {
-    setUploadedModels(uploadedModels.filter(model => model.id !== modelId));
+  const handleDeleteModel = (modelId: string) => {
+    setModels(prev => prev.filter(model => model.id !== modelId));
     toast({
       title: "Model deleted",
-      description: "Model has been removed successfully",
+      description: "Model has been removed from the system",
     });
+  };
+
+  const toggleModelStatus = (modelId: string) => {
+    setModels(prev => prev.map(model => 
+      model.id === modelId 
+        ? { ...model, status: model.status === "active" ? "inactive" : "active" }
+        : model
+    ));
   };
 
   return (
@@ -123,7 +142,7 @@ const ModelManagement = () => {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -131,10 +150,10 @@ const ModelManagement = () => {
                 <span>Upload Model</span>
               </CardTitle>
               <CardDescription>
-                Upload custom ONNX models for computer vision tasks
+                Upload a new ONNX model to the system
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="modelName">Model Name</Label>
                 <Input
@@ -146,18 +165,18 @@ const ModelManagement = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="modelDescription">Description (Optional)</Label>
+                <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
-                  id="modelDescription"
+                  id="description"
                   value={modelDescription}
                   onChange={(e) => setModelDescription(e.target.value)}
-                  placeholder="Describe what this model does"
+                  placeholder="Describe the model's purpose and capabilities"
                   rows={3}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="file">Select ONNX Model</Label>
+                <Label htmlFor="file">Select ONNX Model File</Label>
                 <Input
                   id="file"
                   type="file"
@@ -166,14 +185,14 @@ const ModelManagement = () => {
                   className="cursor-pointer"
                 />
                 <p className="text-sm text-gray-500">
-                  Only ONNX format (.onnx) is supported
+                  Only ONNX format supported
                 </p>
               </div>
 
               {file && (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg animate-fade-in">
                   <div className="flex items-center space-x-3">
-                    <FileText className="h-8 w-8 text-indigo-600" />
+                    <Upload className="h-8 w-8 text-indigo-600" />
                     <div>
                       <p className="font-medium">{file.name}</p>
                       <p className="text-sm text-gray-500">
@@ -187,113 +206,81 @@ const ModelManagement = () => {
               <Button 
                 onClick={handleUpload} 
                 disabled={!file || !modelName.trim() || isUploading}
-                className="w-full"
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
                 size="lg"
               >
-                {isUploading ? "Uploading..." : "Upload Model"}
+                {isUploading ? "Uploading Model..." : "Upload Model"}
               </Button>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5" />
-                <span>Upload Status</span>
-              </CardTitle>
-              <CardDescription>
-                Model upload guidelines and requirements
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h3 className="font-semibold text-blue-900 mb-2">Requirements</h3>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• ONNX format only (.onnx extension)</li>
-                    <li>• Maximum file size: 500 MB</li>
-                    <li>• Model name must be unique</li>
-                    <li>• Compatible with ONNX Runtime</li>
-                  </ul>
-                </div>
-
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h3 className="font-semibold text-green-900 mb-2">Supported Tasks</h3>
-                  <ul className="text-sm text-green-800 space-y-1">
-                    <li>• Object Detection (YOLO, etc.)</li>
-                    <li>• Image Classification</li>
-                    <li>• Semantic Segmentation</li>
-                    <li>• Face Recognition</li>
-                    <li>• OCR and Text Detection</li>
-                  </ul>
-                </div>
-
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <h3 className="font-semibold text-yellow-900 mb-2">Best Practices</h3>
-                  <ul className="text-sm text-yellow-800 space-y-1">
-                    <li>• Test models locally first</li>
-                    <li>• Use descriptive names</li>
-                    <li>• Document input/output formats</li>
-                    <li>• Optimize for inference speed</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Uploaded Models</span>
-            </CardTitle>
-            <CardDescription>
-              Manage your uploaded ONNX models
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {uploadedModels.map((model) => (
-                <div key={model.id} className="p-4 border rounded-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-semibold">{model.name}</h3>
-                        <Badge 
-                          variant={model.status === "active" ? "default" : "secondary"}
-                        >
-                          {model.status}
-                        </Badge>
-                        <Badge variant="outline">{model.format}</Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{model.description}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span>Size: {model.size}</span>
-                        <span>Uploaded: {model.uploadedAt}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2 ml-4">
-                      <Button variant="outline" size="sm">
-                        <Info className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDelete(model.id)}
+          <div className="lg:col-span-2">
+            {isUploading ? (
+              <LoadingSpinner text="Uploading and validating model..." />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Info className="h-5 w-5" />
+                    <span>Uploaded Models ({models.length})</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your uploaded and pre-trained models
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {models.map((model) => (
+                      <div 
+                        key={model.id} 
+                        className="p-4 border rounded-lg hover:shadow-md transition-all duration-200 group"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="font-semibold text-lg group-hover:text-indigo-600 transition-colors">
+                                {model.name}
+                              </h3>
+                              <Badge 
+                                variant={model.status === "active" ? "default" : "secondary"}
+                                className={model.status === "active" ? "bg-green-100 text-green-700" : ""}
+                              >
+                                {model.status}
+                              </Badge>
+                              <Badge variant="outline">{model.type}</Badge>
+                            </div>
+                            <p className="text-gray-600 mb-3">{model.description}</p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span>Size: {model.size}</span>
+                              <span>Uploaded: {model.uploadDate}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleModelStatus(model.id)}
+                            >
+                              {model.status === "active" ? "Deactivate" : "Activate"}
+                            </Button>
+                            <Button
+                              variant="outline" 
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteModel(model.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
 
         <div className="mt-12">
           <Tabs defaultValue="upload" className="w-full">
@@ -349,14 +336,14 @@ const ModelManagement = () => {
                     <div>
                       <h3 className="font-semibold mb-2">Response</h3>
                       <p className="text-sm text-gray-600">
-                        Returns a list of all uploaded models with their metadata
+                        Returns array of all uploaded models with their metadata
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="info" className="mt-6">
               <Card>
                 <CardContent className="p-6">
@@ -364,20 +351,23 @@ const ModelManagement = () => {
                     <div>
                       <h3 className="font-semibold mb-2">Endpoint URL</h3>
                       <code className="bg-gray-100 px-3 py-2 rounded text-sm block">
-                        GET /api/models/{"{modelName}"}
+                        GET /api/models/{`{modelName}`}
                       </code>
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Response</h3>
-                      <p className="text-sm text-gray-600">
-                        Returns detailed information about a specific model
-                      </p>
+                      <h3 className="font-semibold mb-2">Parameters</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">modelName (path)</span>
+                          <Badge variant="destructive">required</Badge>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="delete" className="mt-6">
               <Card>
                 <CardContent className="p-6">
@@ -385,13 +375,22 @@ const ModelManagement = () => {
                     <div>
                       <h3 className="font-semibold mb-2">Endpoint URL</h3>
                       <code className="bg-gray-100 px-3 py-2 rounded text-sm block">
-                        DELETE /api/models/{"{modelName}"}
+                        DELETE /api/models/{`{modelName}`}
                       </code>
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Response</h3>
-                      <p className="text-sm text-gray-600">
-                        Deletes the specified model and returns confirmation
+                      <h3 className="font-semibold mb-2">Parameters</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">modelName (path)</span>
+                          <Badge variant="destructive">required</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Warning</h3>
+                      <p className="text-sm text-red-600">
+                        This action permanently deletes the model and cannot be undone
                       </p>
                     </div>
                   </div>

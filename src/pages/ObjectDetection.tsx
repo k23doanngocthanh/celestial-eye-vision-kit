@@ -5,12 +5,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Eye, Upload, ArrowLeft, CheckCircle, Search, FileText } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Eye, Upload, ArrowLeft, CheckCircle, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { DetectionCanvas } from "@/components/DetectionCanvas";
+import { ResultsTable } from "@/components/ResultsTable";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+
+interface ObjectDetection {
+  content: string;
+  format: string;
+  confidence: number;
+  boundingBox: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+}
 
 const ObjectDetection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -18,19 +33,20 @@ const ObjectDetection = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState([0.5]);
   const [classFilter, setClassFilter] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [detections, setDetections] = useState<ObjectDetection[]>([]);
 
   const detectionModels = [
-    { id: "yolo_v8", name: "YOLO v8", description: "Latest YOLO model" },
-    { id: "yolo_v5", name: "YOLO v5", description: "Stable YOLO model" },
-    { id: "custom_model", name: "Custom Model", description: "User uploaded model" },
+    { id: "yolo_v8", name: "YOLO v8", description: "Latest YOLO object detection model" },
+    { id: "yolo_v5", name: "YOLO v5", description: "Stable YOLO model for general detection" },
+    { id: "ssd_mobilenet", name: "SSD MobileNet", description: "Fast and lightweight detection" },
+    { id: "faster_rcnn", name: "Faster R-CNN", description: "High accuracy object detection" }
   ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
-      setResults(null);
+      setDetections([]);
     }
   };
 
@@ -47,45 +63,41 @@ const ObjectDetection = () => {
     setIsProcessing(true);
     
     setTimeout(() => {
-      const mockResults = {
-        success: true,
-        modelName: selectedModel,
-        imageName: file.name,
-        imageWidth: 800,
-        imageHeight: 600,
-        processingTime: 120,
-        detections: [
-          {
-            class: "person",
-            confidence: 0.95,
-            box: { x1: 100, y1: 150, x2: 300, y2: 500 }
-          },
-          {
-            class: "car",
-            confidence: 0.87,
-            box: { x1: 400, y1: 200, x2: 700, y2: 400 }
-          },
-          {
-            class: "bicycle",
-            confidence: 0.72,
-            box: { x1: 50, y1: 300, x2: 150, y2: 450 }
-          },
-          {
-            class: "dog",
-            confidence: 0.68,
-            box: { x1: 200, y1: 400, x2: 280, y2: 500 }
-          }
-        ].filter(detection => detection.confidence >= confidenceThreshold[0])
-         .filter(detection => !classFilter || detection.class.toLowerCase().includes(classFilter.toLowerCase()))
-      };
+      const mockDetections: ObjectDetection[] = [
+        {
+          content: "person",
+          format: "OBJECT",
+          confidence: 0.92,
+          boundingBox: { x1: 100, y1: 50, x2: 200, y2: 300 }
+        },
+        {
+          content: "car",
+          format: "OBJECT", 
+          confidence: 0.87,
+          boundingBox: { x1: 250, y1: 150, x2: 450, y2: 280 }
+        },
+        {
+          content: "bicycle",
+          format: "OBJECT",
+          confidence: 0.76,
+          boundingBox: { x1: 50, y1: 200, x2: 120, y2: 280 }
+        },
+        {
+          content: "dog",
+          format: "OBJECT",
+          confidence: 0.84,
+          boundingBox: { x1: 300, y1: 280, x2: 400, y2: 350 }
+        }
+      ].filter(detection => detection.confidence >= confidenceThreshold[0]);
       
-      setResults(mockResults);
+      setDetections(mockDetections);
       setIsProcessing(false);
+      
       toast({
-        title: "Detection Complete",
-        description: `Found ${mockResults.detections.length} objects`,
+        title: "Objects detected!",
+        description: `Found ${mockDetections.length} objects using ${selectedModel}`,
       });
-    }, 2000);
+    }, 2800);
   };
 
   return (
@@ -105,7 +117,7 @@ const ObjectDetection = () => {
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <Search className="h-6 w-6 text-red-600" />
+              <Eye className="h-6 w-6 text-red-600" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Object Detection</h1>
@@ -114,18 +126,18 @@ const ObjectDetection = () => {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Upload className="h-5 w-5" />
-                <span>Upload Image</span>
+                <span>Upload & Configure</span>
               </CardTitle>
               <CardDescription>
-                Configure detection parameters and upload an image
+                Select image and detection parameters
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="model">Detection Model</Label>
                 <Select value={selectedModel} onValueChange={setSelectedModel}>
@@ -146,16 +158,13 @@ const ObjectDetection = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confidence">
-                  Confidence Threshold: {confidenceThreshold[0].toFixed(2)}
-                </Label>
+                <Label>Confidence Threshold: {confidenceThreshold[0].toFixed(2)}</Label>
                 <Slider
-                  id="confidence"
-                  min={0.1}
-                  max={1.0}
-                  step={0.05}
                   value={confidenceThreshold}
                   onValueChange={setConfidenceThreshold}
+                  max={1}
+                  min={0.1}
+                  step={0.05}
                   className="w-full"
                 />
                 <p className="text-sm text-gray-500">
@@ -164,20 +173,20 @@ const ObjectDetection = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="classFilter">Class Filter (Optional)</Label>
+                <Label htmlFor="classFilter">Class Filter (optional)</Label>
                 <Input
                   id="classFilter"
                   value={classFilter}
                   onChange={(e) => setClassFilter(e.target.value)}
-                  placeholder="e.g., person, car, dog"
+                  placeholder="e.g., person,car,dog"
                 />
                 <p className="text-sm text-gray-500">
-                  Filter results by specific object classes
+                  Comma-separated class names to filter
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="file">Select Image</Label>
+                <Label htmlFor="file">Select Image File</Label>
                 <Input
                   id="file"
                   type="file"
@@ -186,14 +195,14 @@ const ObjectDetection = () => {
                   className="cursor-pointer"
                 />
                 <p className="text-sm text-gray-500">
-                  Supported formats: JPG, PNG, BMP
+                  Supported: JPG, PNG, BMP
                 </p>
               </div>
 
               {file && (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg animate-fade-in">
                   <div className="flex items-center space-x-3">
-                    <FileText className="h-8 w-8 text-red-600" />
+                    <Eye className="h-8 w-8 text-red-600" />
                     <div>
                       <p className="font-medium">{file.name}</p>
                       <p className="text-sm text-gray-500">
@@ -207,151 +216,113 @@ const ObjectDetection = () => {
               <Button 
                 onClick={simulateProcessing} 
                 disabled={!file || isProcessing}
-                className="w-full"
+                className="w-full bg-red-600 hover:bg-red-700"
                 size="lg"
               >
-                {isProcessing ? "Detecting..." : "Detect Objects"}
+                {isProcessing ? "Detecting Objects..." : "Detect Objects"}
               </Button>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5" />
-                <span>Detection Results</span>
-              </CardTitle>
-              <CardDescription>
-                Object detection results with bounding boxes and confidence scores
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!results ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Upload an image and click "Detect Objects" to see results</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-red-50 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">{results.detections.length}</div>
-                      <div className="text-sm text-gray-600">Objects Found</div>
-                    </div>
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{results.processingTime}ms</div>
-                      <div className="text-sm text-gray-600">Processing Time</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Detected Objects:</h3>
-                    {results.detections.map((detection: any, index: number) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline" className="capitalize">
-                            {detection.class}
-                          </Badge>
-                          <span className="text-sm text-gray-500">
-                            {(detection.confidence * 100).toFixed(1)}% confidence
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          Bounding Box: ({detection.box.x1}, {detection.box.y1}) to ({detection.box.x2}, {detection.box.y2})
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Size: {detection.box.x2 - detection.box.x1} × {detection.box.y2 - detection.box.y1} pixels
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="lg:col-span-2">
+            {isProcessing ? (
+              <LoadingSp innner text="Running object detection model..." />
+            ) : (
+              <DetectionCanvas 
+                imageFile={file} 
+                detections={detections}
+                isProcessing={isProcessing}
+              />
+            )}
+          </div>
         </div>
 
+        {detections.length > 0 && (
+          <div className="animate-fade-in">
+            <ResultsTable detections={detections} />
+          </div>
+        )}
+
         <div className="mt-12">
-          <Tabs defaultValue="endpoint" className="w-full">
+          <Tabs defaultValue="detect" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="endpoint">API Endpoint</TabsTrigger>
-              <TabsTrigger value="request">Request Format</TabsTrigger>
-              <TabsTrigger value="response">Response Format</TabsTrigger>
+              <TabsTrigger value="detect">Detection API</TabsTrigger>
+              <TabsTrigger value="models">Available Models</TabsTrigger>
+              <TabsTrigger value="cache">Cache Management</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="endpoint" className="mt-6">
+            <TabsContent value="detect" className="mt-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     <div>
                       <h3 className="font-semibold mb-2">Endpoint URL</h3>
                       <code className="bg-gray-100 px-3 py-2 rounded text-sm block">
-                        POST /api/detection/detect/{"{modelName}"}
+                        POST /api/detection/detect/{`{modelName}`}
                       </code>
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Content-Type</h3>
+                      <h3 className="font-semibold mb-2">Parameters</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">modelName (path)</span>
+                          <Badge variant="destructive">required</Badge>
+                        </div>
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">image</span>
+                          <Badge variant="destructive">required</Badge>
+                        </div>
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">classNames</span>
+                          <Badge variant="secondary">optional</Badge>
+                        </div>
+                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="font-medium">confThreshold</span>
+                          <Badge variant="secondary">optional</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="models" className="mt-6">
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">Available Detection Models</h3>
+                  <div className="grid gap-3">
+                    {detectionModels.map((model) => (
+                      <div key={model.id} className="p-3 border rounded-lg">
+                        <div className="font-medium">{model.name}</div>
+                        <div className="text-sm text-gray-500">{model.description}</div>
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
+                          {model.id}
+                        </code>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="cache" className="mt-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold mb-2">Clear Model Cache</h3>
                       <code className="bg-gray-100 px-3 py-2 rounded text-sm block">
-                        multipart/form-data
+                        DELETE /api/detection/cache/{`{modelName}`}
+                      </code>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Clear All Cache</h3>
+                      <code className="bg-gray-100 px-3 py-2 rounded text-sm block">
+                        DELETE /api/detection/cache
                       </code>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="request" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Request Parameters</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium">modelName</span>
-                      <Badge variant="destructive">required</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium">image</span>
-                      <Badge variant="destructive">required</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium">classNames</span>
-                      <Badge variant="secondary">optional</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium">confThreshold</span>
-                      <Badge variant="secondary">optional</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="response" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Response Example</h3>
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
-{`{
-  "success": true,
-  "modelName": "yolo_v8",
-  "imageName": "test.jpg",
-  "imageWidth": 800,
-  "imageHeight": 600,
-  "processingTime": 150,
-  "detections": [
-    {
-      "class": "person",
-      "confidence": 0.95,
-      "box": {
-        "x1": 100,
-        "y1": 100,
-        "x2": 300,
-        "y2": 400
-      }
-    }
-  ]
-}`}
-                  </pre>
                 </CardContent>
               </Card>
             </TabsContent>
